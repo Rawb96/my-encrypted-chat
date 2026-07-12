@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Heavy Encrypted Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; height: 90vh; padding: 20px; }
+        #messages { list-style-type: none; margin: 0; padding: 0; flex-grow: 1; overflow-y: auto; border: 1px solid #ccc; }
+        #messages li { padding: 8px; border-bottom: 1px solid #eee; }
+        .system { color: gray; font-style: italic; }
+        .controls { margin-top: 10px; display: flex; gap: 10px; }
+        input { padding: 10px; }
+        #msgInput { flex-grow: 1; }
+    </style>
+</head>
+<body>
+    <h2>🔐 Encrypted Chat</h2>
+    <p>Enter a shared "Secret Key" to encrypt/decrypt messages.</p>
+    <input type="text" id="secretKey" placeholder="Enter Shared Secret Key..." value="my-super-secret-key">
+    
+    <ul id="messages"></ul>
+
+    <div class="controls">
+        <input type="text" id="msgInput" placeholder="Type a message...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        const socket = io();
+        const messages = document.getElementById('messages');
+        const msgInput = document.getElementById('msgInput');
+        const keyInput = document.getElementById('secretKey');
+
+        function sendMessage() {
+            const text = msgInput.value;
+            const key = keyInput.value;
+            if (!text || !key) return alert("Need message and key!");
+
+            // --- ENCRYPTION STEP ---
+            // We encrypt the message using AES-256
+            const encrypted = CryptoJS.AES.encrypt(text, key).toString();
+
+            // Send only the gibberish to the server
+            socket.emit('chat message', { encryptedMsg: encrypted });
+
+            // Add our own message to the screen (decrypted)
+            addMessage(`You: ${text}`, 'self');
+            msgInput.value = '';
+        }
+
+        socket.on('chat message', (data) => {
+            const key = keyInput.value;
+            try {
+                // --- DECRYPTION STEP ---
+                // We attempt to decrypt the incoming gibberish using our local key
+                const bytes  = CryptoJS.AES.decrypt(data.encryptedMsg, key);
+                const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
+
+                if (decryptedText) {
+                    addMessage(`Peer: ${decryptedText}`, 'peer');
+                } else {
+                    addMessage(`Peer: [Decryption Failed - Wrong Key]`, 'error');
+                }
+            } catch (e) {
+                addMessage(`Peer: [Error Decrypting]`, 'error');
+            }
+        });
+
+        function addMessage(text, type) {
+            const item = document.createElement('li');
+            item.textContent = text;
+            if (type === 'self') item.style.color = 'blue';
+            messages.appendChild(item);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        // Allow "Enter" key to send
+        msgInput.addEventListener("keypress", (e) => { if (e.key === "Enter") sendMessage(); });
+    </script>
+</body>
+</html>
