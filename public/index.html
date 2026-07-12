@@ -27,7 +27,7 @@
     </div>
 
     <script>
-        const socket = io();
+        const socket = io('https://my-encrypted-chat-production.up.railway.app/', { transports: ['websocket'] });
         const messages = document.getElementById('messages');
         const msgInput = document.getElementById('msgInput');
         const keyInput = document.getElementById('secretKey');
